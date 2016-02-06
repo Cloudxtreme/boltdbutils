@@ -596,6 +596,11 @@ func (c *Cursor) saveState() {
 
 func (c *Cursor) restoreState() {
 	for i := 0; i < len(c.cursors); i++ {
+		if c.cursorsSave[i] == nil {
+			c.cursors[i] = nil
+			c.ks[i] = nil
+			continue
+		}
 		*c.cursors[i] = *c.cursorsSave[i]
 		copy(c.ks[i], c.ksSave[i])
 	}
