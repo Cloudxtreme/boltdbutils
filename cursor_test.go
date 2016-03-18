@@ -775,3 +775,78 @@ func TestCursorSkipKeys(t *testing.T) {
 		t.Fatal(e.Trace(e.Forward(err)))
 	}
 }
+
+func TestCursorReinsert(t *testing.T) {
+	data := []testData{
+		{[]byte("test_bucket"), [][]byte{[]byte{'0'}, []byte("pt-br"), EncInt(2015), EncInt(1), EncInt(4), EncInt(14), EncInt(58), EncInt(59), []byte("Log")}, []byte("11")},
+		{[]byte("test_bucket"), [][]byte{[]byte{'1'}, []byte("pt-br"), EncInt(2015), EncInt(12), EncInt(23), EncInt(17), EncInt(25), EncInt(59), []byte("Sem assunto e sem nome")}, []byte("12")},
+	}
+	filename, err := rand.FileName("blog-", "db", 10)
+	if err != nil {
+		t.Fatal(e.Trace(e.Forward(err)))
+	}
+
+	dir, err := ioutil.TempDir("", "blog-")
+	if err != nil {
+		t.Fatal(e.Trace(e.Forward(err)))
+	}
+
+	db, err := bolt.Open(filepath.Join(dir, filename), 0600, nil)
+	if err != nil {
+		t.Fatal(e.Trace(e.Forward(err)))
+	}
+	err = db.Update(func(tx *bolt.Tx) error {
+		for i, d := range data {
+			err := Put(tx, d.Bucket, d.Keys, d.Data)
+			if err != nil {
+				return e.Push(err, e.New("Fail to put %v", i))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(e.Trace(e.Forward(err)))
+	}
+	err = db.Update(func(tx *bolt.Tx) error {
+		d := data[0]
+		err := Del(tx, d.Bucket, d.Keys)
+		if err != nil {
+			return e.Forward(err)
+		}
+		err = Put(tx, d.Bucket, d.Keys, d.Data)
+		if err != nil {
+			return e.Forward(err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(e.Trace(e.Forward(err)))
+	}
+	err = db.Update(func(tx *bolt.Tx) error {
+		d := data[0]
+		_, err := Get(tx, d.Bucket, d.Keys)
+		if err != nil {
+			return e.Forward(err)
+		}
+		c := &Cursor{
+			Tx:      tx,
+			Bucket:  []byte("test_bucket"),
+			NumKeys: 9,
+		}
+		err = c.Init([]byte{'0'}, []byte("pt-br"))
+		if err != nil {
+			return e.Forward(err)
+		}
+		k, v := c.First()
+		if k == nil {
+			return e.New("can't get the first record")
+		}
+		if !bytes.Equal(v, d.Data) {
+			return e.New("not equal %v", string(v))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(e.Trace(e.Forward(err)))
+	}
+}
