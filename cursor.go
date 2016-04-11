@@ -22,11 +22,14 @@ type Cursor struct {
 	cursors     []*bolt.Cursor
 	cursorsSave []*bolt.Cursor
 	// actual keys under the cursor
-	ks       [][]byte
+	ks [][]byte
+	// save the keys
 	ksSave   [][]byte
 	rollback bool
-	skip     [][]byte
-	ls       int
+	// skip cursor to this keys
+	skip [][]byte
+	// len of the skip keys
+	ls int
 }
 
 func (c *Cursor) Init(keys ...[]byte) error {
@@ -510,7 +513,7 @@ func (c *Cursor) forwardNext(i int) ([][]byte, []byte) {
 		if i == c.ls {
 			return nil, nil
 		}
-		c.err = e.New("db error")
+		//c.err = e.New("db error")
 		return nil, nil
 	}
 	c.ks[i] = k
@@ -587,7 +590,9 @@ func (c *Cursor) nextBack(i int) ([][]byte, []byte) {
 func (c *Cursor) saveState() {
 	for i := 0; i < len(c.cursors); i++ {
 		if c.cursors[i] == nil {
-			continue
+			//continue
+			// Teste: troquei para break deve ser mais correto
+			break
 		}
 		*c.cursorsSave[i] = *c.cursors[i]
 		copy(c.ksSave[i], c.ks[i])
@@ -596,11 +601,15 @@ func (c *Cursor) saveState() {
 
 func (c *Cursor) restoreState() {
 	for i := 0; i < len(c.cursors); i++ {
-		if c.cursorsSave[i] == nil {
+		if c.cursorsSave[i] == nil || c.cursors[i] == nil {
 			c.cursors[i] = nil
 			c.ks[i] = nil
 			continue
 		}
+		// TODO: Crash here. pubstatus == pub
+		// if c.cursors[i] == nil {
+		// 	continue
+		// }
 		*c.cursors[i] = *c.cursorsSave[i]
 		copy(c.ks[i], c.ksSave[i])
 	}

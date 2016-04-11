@@ -102,13 +102,16 @@ func Del(tx *bolt.Tx, bucket []byte, keys [][]byte) error {
 		}
 	}
 
-	for level := len(keys) - 1; level >= 0; level-- {
+	for level := len(bs) - 1; level >= 0; level-- {
 		err := bs[level].Delete(keys[level])
 		if err != nil {
 			return e.Forward(err)
 		}
-		if bs[level].Stats().KeyN == 0 {
-			err = bs[level].DeleteBucket(bname[level])
+		if bs[level].Stats().KeyN <= 1 {
+			if level-1 < 0 {
+				break
+			}
+			err = tx.DeleteBucket(bname[level])
 			if err != nil {
 				return e.Forward(err)
 			}
